@@ -1,0 +1,21 @@
+# FlightAI Voice Chat - Modular Requirements
+# Core dependencies for the modular architecture
+
+# AI and API
+openai>=1.0.0
+python-dotenv>=1.0.0
+
+# Web Interface
+gradio>=4.0.0
+
+# Voice Processing
+SpeechRecognition>=3.10.0
+pyaudio>=0.2.11
+
+# Audio Processing
+pydub>=0.25.1
+
+# Note: Some systems may need additional audio dependencies:
+# macOS: brew install portaudio
+# Ubuntu: sudo apt-get install portaudio19-dev
+# Windows: Usually included with pyaudio
