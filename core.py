@@ -1,4 +1,3 @@
-import os
 import json
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -38,18 +37,22 @@ price_function = {
 
 tools = [{"type": "function", "function": price_function}]
 
-def handle_tool_call(message):
-    """Handle tool calls for ticket price queries"""
-    tool_call = message.tool_calls[0]
-    arguments = json.loads(tool_call.function.arguments)
-    city = arguments.get("destination_city")
-    price = get_ticket_price(city)
-    response = {
-        "role": "tool",
-        "content": json.dumps({"destination_city": city, "price": price}),
-        "tool_call_id": tool_call.id,
-    }
-    return response, city
+def handle_tool_calls(message):
+    """Handle all tool calls for ticket price queries. Returns (list of tool responses, first city for sync)."""
+    responses = []
+    first_city = None
+    for tool_call in message.tool_calls:
+        arguments = json.loads(tool_call.function.arguments)
+        city = arguments.get("destination_city")
+        price = get_ticket_price(city)
+        if first_city is None:
+            first_city = city
+        responses.append({
+            "role": "tool",
+            "content": json.dumps({"destination_city": city, "price": price}),
+            "tool_call_id": tool_call.id,
+        })
+    return responses, first_city
 
 def chat(history):
     """Generate AI response without adding to history (for audio sync)"""
@@ -89,24 +92,26 @@ def chat(history):
 
     if response.choices[0].finish_reason == "tool_calls":
         message = response.choices[0].message
-        tool_response, city = handle_tool_call(message)
+        tool_responses, city = handle_tool_calls(message)
 
         assistant_message = {
             "role": "assistant",
             "content": message.content or "",
             "tool_calls": [
                 {
-                    "id": tool_call.id,
+                    "id": tc.id,
                     "type": "function",
                     "function": {
-                        "name": tool_call.function.name,
-                        "arguments": tool_call.function.arguments
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments
                     }
-                } for tool_call in message.tool_calls
+                }
+                for tc in message.tool_calls
             ]
         }
         messages.append(assistant_message)
-        messages.append(tool_response)
+        for tool_response in tool_responses:
+            messages.append(tool_response)
 
         final_response = openai.chat.completions.create(
             model=MODEL,
